@@ -55,7 +55,7 @@ ui <- fluidPage(
       mainPanel(
         
          tabsetPanel(type = "tab",
-                     tabPanel("plot1", plotOutput(outputId = "id.distPlot1")),
+                     tabPanel("plot1",h3("Closest office from your address:"),textOutput("office"),plotOutput(outputId = "id.distPlot1")),
                      tabPanel("plot2", plotOutput(outputId = "id.distPlot2")))
       )
    )
@@ -69,41 +69,36 @@ server <- function(input, output) {
    library(ggplot2)
    library(gmapsdistance)
    library(ggmap)
+
    geo.office = read.csv("./mva_data.csv")
    des<-paste(geo.office$lat , geo.office$lon,sep = "+")
-   mvadata=read.csv("./mvadata.csv")%>%mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")))
    
-   #user_address= reactive ({geocode(paste(paste(input$id.street,input$id.city,"MD",sep=","),input$id.zipcode))})#paste user input address and find its lattitude &longitude
-  # ori<-paste(user_address$lat, user_address$lon,sep = "+")
-  #disinfor<-reactive({gmapsdistance(origin = ori,destination = des %>% as.vector(),
-           #mode = input$id.travel.method, 
-            #shape = "long")})#compute the distance from origin to all the office locations
-  #des_closest=geo.office[which.min(disinfor()$Distance$Distance),]#find out the closest office
-  
-
+   closet_office=reactive({
+   address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode))},error=function(e){cat("The input address is not valid,try another one!\n")})
+  if(length(address)>0){
+    ori=paste(address$lat,address$lon,sep="+")
+   mvadata=read.csv("./mvadata.csv")%>%mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")))
+   disinfor<-gmapsdistance(origin = ori,destination = des %>% as.vector(),
+           mode =input$id.travel.method, 
+            shape = "long")#compute the distance from origin to all the office locations
+  geo.office[which.min(disinfor$Distance$Distance),c("Name","Address")]#find out the closest office
+ }  })
+   output$office <- renderText({
+     a=closet_office()
+     paste(a$Name,a$Address)
+   })
    output$id.distPlot1 <- renderPlot({
      
-      sub.mvadata = mvadata %>%
-        filter(office == as.character(des_closest$Name )& visit.reason == gsub("[[:space:]]", "",input$id.visit.reason) & day == input$id.day) %>%
-        group_by(time) %>%
-        summarise(mean.wait.people = mean(wait.people),
-                  mean.wait.time = mean(wait.time)) %>%
-        as.data.frame()
-     
-      qplot(sub.mvadata$time, sub.mvadata$mean.wait.people, 
-           col = 'darkgray', border = 'white',
-           main = "Histogram of Average Number of Waiting People",
-           xlab = "Time", ylab = "Average Number of Waiting People")
-
+    # MAP
    })
    
    output$id.distPlot2 <- renderPlot({
-     
+     office_closest=closet_office()
       sub.mvadata = mvadata %>%
-        filter(office == as.character(des_closest$Name ) & visit.reason == gsub("[[:space:]]", "",input$id.visit.reason) & day == input$id.day)%>%
+        filter(office == as.character(office_closest$Name) & service == input$id.visit.reason & weekday == input$id.day)%>%
         group_by(time) %>%
-        summarise(mean.wait.people = mean(wait.people),
-                  mean.wait.time = mean(wait.time)) %>%
+        summarise(mean.wait.people = mean(num_people),
+                  mean.wait.time = mean(wait_time)) %>%
         as.data.frame()
      
       hist(sub.mvadata$mean.wait.time, 
