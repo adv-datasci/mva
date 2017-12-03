@@ -69,12 +69,13 @@ server <- function(input, output) {
    library(ggplot2)
    library(gmapsdistance)
    library(ggmap)
-
+   library(ggalt)
+  
    geo.office = read.csv("./mva_data.csv")
    des<-paste(geo.office$lat , geo.office$lon,sep = "+")
    
    closet_office=reactive({
-   address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode))},error=function(e){cat("The input address is not valid,try another one!\n")})
+   address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode))},error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
   if(length(address)>0){
     ori=paste(address$lat,address$lon,sep="+")
    mvadata=read.csv("./mvadata.csv")%>%mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")))
@@ -89,7 +90,29 @@ server <- function(input, output) {
    })
    output$id.distPlot1 <- renderPlot({
      
-    # MAP
+     # Get User's Coordinates --------------------------------
+     address<-paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode)
+     address_loc=tryCatch({geocode(address)},error=function(e){cat("The input address is not valid,try another one!\n")})
+     a=closet_office()
+     
+      if(length(address_loc)>0){
+        places_loc <- geocode(as.character(a$Address))  # get longitudes and latitudes
+        places_loc<-rbind(address_loc,places_loc)
+        qmap(as.character(input$id.city), zoom = 10,source="google",maptype="roadmap")+  geom_point(aes(x=lon, y=lat),
+                                                 data =places_loc, 
+                                                 alpha = 0.7, 
+                                                 size = 2, 
+                                                 color = "tomato")+ geom_encircle(aes(x=lon, y=lat),
+                                                                                  data = places_loc, size = 2, color = "blue")+geom_text(aes(x=lon, y=lat+0.01),
+                                                                                                                                         data = places_loc,label=c("Your Address","Closest MVA office"),cex=1.8,colour="red")
+       
+
+       
+       }
+     
+     
+     
+          
    })
    
    output$id.distPlot2 <- renderPlot({
