@@ -1,5 +1,4 @@
 
-
 library(shiny)
 
 # Define UI for application that draws a histogram
@@ -57,7 +56,6 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
-<<<<<<< HEAD
   setwd("/Users/yeyazheng/Desktop/327")
    library(dplyr)
    library(ggplot2)
@@ -122,72 +120,9 @@ server <- function(input, output) {
            col = 'darkgray', border = 'white',
            main = "Histogram of Average Waiting Time",
            xlab = "Average Waiting Time", ylab = "Frequncy")
-=======
-  library(dplyr)
-  library(ggplot2)
-  library(gmapsdistance)
-  library(ggmap)
-  
-  setwd("~/Desktop/Data Science Project")
-  geo.office = read.csv("./mva_data.csv")
-  des<-paste(geo.office$lat , geo.office$lon,sep = "+")
-  
-  closet_office=reactive({
-    address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode))},error=function(e){cat("The input address is not valid,try another one!\n")})
-    if(length(address)>0){
-      ori=paste(address$lat,address$lon,sep="+")
-      mvadata = 
-        read.table("https://raw.githubusercontent.com/adv-datasci/mva/master/mvadata.csv", sep = ",", header = T) %>% 
-        mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")))
-      disinfor <- gmapsdistance(origin = ori,destination = des %>% as.vector(),
-                              mode =input$id.travel.method, 
-                              shape = "long")#compute the distance from origin to all the office locations
-      geo.office[which.min(disinfor$Distance$Distance),c("Name","Address")]#find out the closest office
-    }  })
-  
-  output$office <- renderText({
-    a = closet_office()
-    paste(a$Name,a$Address)
-  })
-  
-  output$id.distPlot1 <- renderPlot({
-    
-    # Get User's Coordinates --------------------------------
-    address<-paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode)
-    address_loc = tryCatch({geocode(address)},error=function(e){cat("The input address is not valid,try another one!\n")})
-    a = closet_office()
-    
-    if(length(address_loc)>0){
->>>>>>> 5e94dae60eec7b4271bb63fb21235fddb90cd445
-      
-      map1=qmap(address, maprange = TRUE, zoom =13,
-                base_layer = ggplot(aes(x=lon, y=lat), data = address_loc)) +
-        geom_point()
-      
-      places_loc <- geocode(as.character(a$Address))  # get longitudes and latitudes
-      
-      # Plot Open Street Map -------------------------------------
-      map1 + geom_point(aes(x=lon, y=lat),
-                        data = places_loc, 
-                        alpha = 0.7,
-                        size = 7)
-    }
-  })
-                        
-  
-  output$id.distPlot2 <- renderPlot({
-    office_closest=closet_office()
-    sub.mvadata = mvadata %>%
-      filter(office == as.character(office_closest$Name) & service == gsub(" ", "", input$id.visit.reason) & weekday == input$id.day)%>%
-      group_by(time) %>%
-      summarise(mean.wait.people = mean(num_people),
-                mean.wait.time = mean(wait_time)) %>%
-      as.data.frame()
-    
-    hist(sub.mvadata$mean.wait.time, 
-         col = 'darkgray', border = 'white',
-         main = "Histogram of Average Waiting Time",
-         xlab = "Average Waiting Time", ylab = "Frequncy", breaks = 30)
+
+
+                       
     
   })
   }
