@@ -67,14 +67,14 @@ server <- function(input, output) {
    des<-paste(geo.office$lat , geo.office$lon,sep = "+")
    
    closet_office=reactive({
-   address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode))},error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
+   address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode),source = "google")},error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
   if(length(address)>0){
     ori=paste(address$lat,address$lon,sep="+")
-   mvadata=read.csv("./mvadata.csv")%>%mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")))
+   mvadata=read.csv("./mvadata.csv")%>%mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")),service=as.character(service),office=as.character(office))
    disinfor<-gmapsdistance(origin = ori,destination = des %>% as.vector(),
            mode =input$id.travel.method, 
             shape = "long")#compute the distance from origin to all the office locations
-  geo.office[which.min(disinfor$Distance$Distance),c("Name","Address")]#find out the closest office
+  geo.office[which.min(disinfor$Distance$Distance),]#find out the closest office
  }  })
    output$office <- renderText({
      a=closet_office()
@@ -84,11 +84,11 @@ server <- function(input, output) {
      
      # Get User's Coordinates --------------------------------
      address<-paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode)
-     address_loc=tryCatch({geocode(address)},error=function(e){cat("The input address is not valid,try another one!\n")})
+     address_loc=tryCatch({geocode(address,source = "google")},error=function(e){cat("The input address is not valid,try another one!\n")})
      a=closet_office()
      
       if(length(address_loc)>0){
-        places_loc <- geocode(as.character(a$Address))  # get longitudes and latitudes
+        places_loc <- data.frame(lon=a$lon,lat=a$lat)  # get longitudes and latitudes
         places_loc<-rbind(address_loc,places_loc)
         qmap(as.character(input$id.city), zoom = 10,source="google",maptype="roadmap")+  geom_point(aes(x=lon, y=lat),
                                                  data =places_loc, 
@@ -109,6 +109,7 @@ server <- function(input, output) {
    
    output$id.distPlot2 <- renderPlot({
      office_closest=closet_office()
+     
       sub.mvadata = mvadata %>%
         filter(office == as.character(office_closest$Name) & service == input$id.visit.reason & weekday == input$id.day)%>%
         group_by(time) %>%
