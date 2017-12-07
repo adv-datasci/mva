@@ -50,6 +50,10 @@ for(i in seq_along(filenames)){
   
 }
 
+# add time index
+library(kimisc)
+mvadata$index = ceiling((hms.to.seconds(mvadata$time)+1-30600)/300)
+
 ###########################
 ## export to .csv file
 ###########################
