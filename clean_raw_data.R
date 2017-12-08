@@ -10,7 +10,7 @@ library(dplyr)
 wd = getwd()
 data.wd = paste0(wd,"/data")
 
-filenames = list.files(data.wd)[-1]
+filenames = list.files(data.wd)
 
 ###########################
 ## read .txt raw data
@@ -50,9 +50,23 @@ for(i in seq_along(filenames)){
   
 }
 
-# add time index
+###########################
+## add time index
+###########################
+
 library(kimisc)
 mvadata$index = ceiling((hms.to.seconds(mvadata$time)+1-hms.to.seconds("08:30:00"))/300)
+
+###########################
+## delete invalid data 
+###########################
+
+library(dplyr)
+mvadata = mvadata %>%
+  # delete holidays: Veteran's day and Thanksgiving Day
+  filter(!date %in% c("2017-11-10", "2017-11-11", "2017-11-23"),
+         # delete Saturday afternoon
+         !(day == "Saturday" & index %in% c(43:96)))
 
 ###########################
 ## export to .csv file
