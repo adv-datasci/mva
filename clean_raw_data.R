@@ -66,7 +66,9 @@ mvadata = mvadata %>%
   # delete holidays: Veteran's day and Thanksgiving Day
   filter(!date %in% c("2017-11-10", "2017-11-11", "2017-11-23"),
          # delete Saturday afternoon
-         !(day == "Saturday" & index %in% c(43:96)))
+         !(day == "Saturday" & index %in% c(43:96))) %>%
+  # capitalize the first letter of office name
+  mutate(office = capitalize(office))
 
 ###########################
 ## export to .csv file
