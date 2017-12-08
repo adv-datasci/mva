@@ -1,5 +1,7 @@
 
 library(shiny)
+library(leaflet)
+library(DT)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -46,6 +48,7 @@ ui <- fluidPage(
     ),
     
     # Show a plot of the generated distribution
+    
     mainPanel(
       
       tabsetPanel(type = "tab",
@@ -68,6 +71,9 @@ ui <- fluidPage(
 server <- function(input, output){
   
    #setwd("/Users/yeyazheng/Desktop/327")
+   library(leaflet)
+   library(DT)
+   library(maps)
    library(dplyr)
    library(ggplot2)
    library(gmapsdistance)
@@ -127,7 +133,6 @@ server <- function(input, output){
      })
    
    # output map
-   library(leaflet)
    output$id.distPlot1 <- renderLeaflet({
      
      a = closest_office()
@@ -150,7 +155,6 @@ server <- function(input, output){
    })
 
    # output table
-   library(DT)
    output$gmapresultTable <- DT::renderDataTable({
      a = gmapresult() %>%
        select(Office, Address, `Time (minutes)`, `Distance (miles)`)
