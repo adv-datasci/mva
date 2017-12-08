@@ -9,123 +9,214 @@ ui <- fluidPage(
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
+    
     sidebarPanel(
       
       textInput(inputId="id.street", label="Street", value = ""),
+      
       textInput(inputId="id.city", label="City", value = ""),
+      
       textInput(inputId="id.zipcode", label="Zipcode", value = ""),
       
       selectInput(inputId = "id.travel.method",
-                  label = "Select Your Traveling Method",
+                  label = "Select Mode of Travel",
                   choices = c("driving","walking","bicycling","transit")),
       
       
       selectInput(inputId = "id.visit.reason",
-                  label = "Select the visit reason",
+                  label = "Select Service",
                   choices = c("Driver License Renewal", "Insurance Compliance Division", "Learners Permit",
                               "Other Drivers Services", "Other Vehicle Services", "Registration Renewal", 
                               "Tag Return","Title")),
       
       selectInput(inputId = "id.day",
-                  label = "Select the day",
-                  choices = c("Monday","Tuesday","Wednesday","Thursday","Friday"))
-      ,
-      sliderInput(inputId="id.time", 
-                  label="Select Time", 
-                  min = as.POSIXct("08:00:00", format = "%H:%M:%S"),
-                  max = as.POSIXct("17:00:00", format = "%H:%M:%S"),
-                  value =as.POSIXct("08:00:00", format = "%H:%M:%S"),
-                  step=900,
-                  timeFormat = "%H:%M:%S", ticks = F, animate = T)
+                  label = "Select day",
+                  choices = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")),
       
+      sliderInput(inputId = "id.time",
+                  label = "Select Time",
+                  min = as.POSIXct("08:30:00", format = "%H:%M:%S"),
+                  max = as.POSIXct("16:30:00", format = "%H:%M:%S"),
+                  value = c(as.POSIXct("10:00:00", format = "%H:%M:%S"), as.POSIXct("14:00:00", format = "%H:%M:%S")),
+                  step = 300,
+                  timeFormat = "%H:%M:%S", ticks = F, animate = T),
+
+      submitButton("Update")
       
     ),
-    
-    
     
     # Show a plot of the generated distribution
     mainPanel(
       
       tabsetPanel(type = "tab",
-                  tabPanel("plot1",h3("Closest office from your address:"),textOutput("office"),plotOutput(outputId = "id.distPlot1")),
-                  tabPanel("plot2", plotOutput(outputId = "id.distPlot2")))
+                  tabPanel("plot1", 
+                           h3("The nearest office from your location is"), 
+                           textOutput("office"),
+                           leafletOutput(outputId = "id.distPlot1"),
+                           h3("Estimated travel time and distance from your location to MVA offices"),
+                           DT::dataTableOutput("gmapresultTable")),
+                  tabPanel("plot2",
+                           plotOutput(outputId = "id.distPlot2")))
+      
     )
+    
   )
+  
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
+# Define server logic required to draw a plot
+server <- function(input, output){
   
-  setwd("/Users/yeyazheng/Desktop/327")
+   #setwd("/Users/yeyazheng/Desktop/327")
    library(dplyr)
    library(ggplot2)
    library(gmapsdistance)
    library(ggmap)
    library(ggalt)
   
-   geo.office = read.csv("./mva_data.csv")
+   geo.office = read.csv("./mva data.csv")
    des<-paste(geo.office$lat , geo.office$lon,sep = "+")
    
-   closet_office=reactive({
-   address<-tryCatch({geocode(paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode),source = "google")},error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
-  if(length(address)>0){
-    ori=paste(address$lat,address$lon,sep="+")
-   mvadata=read.csv("./mvadata.csv")%>%mutate(weekday=weekdays(as.Date(as.character(date),"%Y-%m-%d")),service=as.character(service),office=as.character(office))
-   disinfor<-gmapsdistance(origin = ori,destination = des %>% as.vector(),
-           mode =input$id.travel.method, 
-            shape = "long")#compute the distance from origin to all the office locations
-  geo.office[which.min(disinfor$Distance$Distance),]#find out the closest office
- }  })
-   output$office <- renderText({
-     a=closet_office()
-     paste(a$Name,a$Address)
+   ########################
+   ## Find the nearest office
+   ########################
+  
+   user.address = reactive({
+     paste(paste(input$id.street ,input$id.city,"MD",sep=", "),input$id.zipcode)
    })
-   output$id.distPlot1 <- renderPlot({
+   
+   user.address.cord = reactive({
+     tryCatch({geocode(user.address(), source = "google")},
+              error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
+   })
+   
+   gmapresult = reactive({
+     if(length(user.address.cord())>0){
+       ori = paste(user.address.cord()$lat,user.address.cord()$lon,sep="+")
+       mvadata = read.csv("./mvadata.csv") %>%
+         mutate(day = as.character(day),
+                service = as.character(service),
+                office = as.character(office))
+       disinfor<-gmapsdistance(origin = ori, destination = des %>% as.vector(),
+                               mode = input$id.travel.method, 
+                               shape = "long")#compute the distance from origin to all the office locations
+       result = cbind(geo.office$Name, geo.office$Address,
+                      disinfor$Status, disinfor$Time$Time, disinfor$Distance$Distance) %>% 
+         setNames(c("Office","Address","or","de","status","Time (minutes)","Distance (miles)")) %>%
+         mutate(`Time (minutes)` = round(`Time (minutes)`/60, 0), # convert unit from sec to minute
+                `Distance (miles)` = round(`Distance (miles)` * 0.000621371,1)) # convert unit from m to mile
+       result
+     }
+   })
+   
+   closest_office = reactive({
+     geo.office[which.min(gmapresult()$`Distance (miles)`),]
+   })
+   
+   # closest_office = reactive({
+   #   
+   # # get longitude and latitude of user's location
+   # user.address = paste(paste(input$id.street ,input$id.city,"MD",sep=", "),input$id.zipcode)
+   # user.address.cord<-tryCatch({geocode(user.address, source = "google")},
+   #                   error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
+   # 
+   # # compute the distance from user's location to all the officee locations
+   # if(length(user.address.cord)>0){
+   #   ori = paste(user.address.cord$lat,user.address.cord$lon,sep="+")
+   #   mvadata = read.csv("./mvadata.csv") %>%
+   #     mutate(day = as.character(day),
+   #            service = as.character(service),
+   #            office = as.character(office))
+   #   disinfor<-gmapsdistance(origin = ori, destination = des %>% as.vector(),
+   #                           mode = input$id.travel.method, 
+   #                           shape = "long")#compute the distance from origin to all the office locations
+   #   geo.office[which.min(disinfor$Distance$Distance),]#find out the closest office
+   #   }
+   # })
+   
+   ########################
+   ## Output results
+   ########################
+   
+   # output the nearest office
+   output$office <- renderText({
      
-     # Get User's Coordinates --------------------------------
-     address<-paste(paste(input$id.street ,input$id.city,"MD",sep=","),input$id.zipcode)
-     address_loc=tryCatch({geocode(address,source = "google")},error=function(e){cat("The input address is not valid,try another one!\n")})
-     a=closet_office()
+     a=closest_office()
+     paste(a$Name, a$Address)
+   
+     })
+   
+   # output map
+   library(leaflet)
+   output$id.distPlot1 <- renderLeaflet({
      
-      if(length(address_loc)>0){
-        places_loc <- data.frame(lon=a$lon,lat=a$lat)  # get longitudes and latitudes
-        places_loc<-rbind(address_loc,places_loc)
-        qmap(as.character(input$id.city), zoom = 10,source="google",maptype="roadmap")+  geom_point(aes(x=lon, y=lat),
-                                                 data =places_loc, 
-                                                 alpha = 0.7, 
-                                                 size = 2, 
-                                                 color = "tomato")+ geom_encircle(aes(x=lon, y=lat),
-                                                                                  data = places_loc, size = 2, color = "blue")+geom_text(aes(x=lon, y=lat+0.01),
-                                                                                                                                         data = places_loc,label=c("Your Address","Closest MVA office"),cex=1.8,colour="red")
-       
+     a = closest_office()
+     b = user.address()
+     c = user.address.cord()
+     
+     maryland = map("county","maryland",fill=TRUE, plot=FALSE)
+     leaflet(data = maryland) %>% 
+       addTiles() %>%
+       addPolygons(fillColor = topo.colors(10, alpha = 0.1), stroke = TRUE, color = "blue", weight = 2) %>%
+       # set default view to Baltimore area
+       # setView(lng = -77.03687 , lat = 38.90719, zoom = 8) %>% 
+       fitBounds(lng1 = a$lon, lat1 = a$lat, lng2 = c$lon, lat2 = c$lat) %>%
+       addAwesomeMarkers(lng = a$lon, lat = a$lat, label = paste(a$Name, "office:", a$Address),
+                         icon = makeAwesomeIcon(icon = "flag", markerColor = "black", iconColor = "white"),
+                         labelOptions = labelOptions(noHide = T)) %>%
+       addAwesomeMarkers(lng = c$lon, lat = c$lat, label = paste("Your Location :", b),
+                         icon = makeAwesomeIcon(icon = "home", markerColor = "red", iconColor = "white"),
+                         labelOptions = labelOptions(noHide = T))
+   })
 
-       
-       }
-     
-     
-     
-          
+   # output table
+   library(DT)
+   output$gmapresultTable <- DT::renderDataTable({
+     a = gmapresult() %>%
+       select(Office, Address, `Time (minutes)`, `Distance (miles)`)
+     DT::datatable(a)
    })
    
    output$id.distPlot2 <- renderPlot({
-     office_closest=closet_office()
-     
+
+     office_closest=closest_office()
+
       sub.mvadata = mvadata %>%
-        filter(office == as.character(office_closest$Name) & service == input$id.visit.reason & weekday == input$id.day)%>%
-        group_by(time) %>%
+        filter(office == as.character(office_closest$Name) & service == gsub(pattern = " ", replacement =  "", x = input$id.visit.reason) & day == input$id.day) %>%
+        group_by(index) %>%
         summarise(mean.wait.people = mean(num_people),
                   mean.wait.time = mean(wait_time)) %>%
         as.data.frame()
-     
-      hist(sub.mvadata$mean.wait.time, 
-           col = 'darkgray', border = 'white',
-           main = "Histogram of Average Waiting Time",
-           xlab = "Average Waiting Time", ylab = "Frequncy")
 
+      plot(sub.mvadata$index, sub.mvadata$mean.wait.time,
+           col = 'darkgray', pch = 16,
+           xlab = "Time Index (5 min)", ylab = "Mean Waiting Time (minutes)")
 
-                       
-    
   })
+   
+   
+   #  output$id.distPlot1 <- renderPlot({
+   # 
+   #    # Get User's Coordinates --------------------------------
+   #    address<-paste(paste(input$id.street ,input$id.city,"MD",sep=", "),input$id.zipcode)
+   #    address_loc=tryCatch({geocode(address,source = "google")},
+   #                         error=function(e){cat("The input address is not valid,try another one!\n")})
+   #    a=closet_office()
+   #    
+   #   if(length(address_loc)>0){
+   #     places_loc <- data.frame(lon=a$lon,lat=a$lat)  # get longitudes and latitudes
+   #     places_loc <- rbind(address_loc,places_loc)
+   #     qmap(as.character(input$id.city), zoom = 10,source="google", maptype="roadmap") +
+   #       geom_point(aes(x=lon, y=lat), data = places_loc, alpha = 0.7, size = 2, color = "tomato") + 
+   #       geom_encircle(aes(x=lon, y=lat), data = places_loc, size = 2, color = "blue") +
+   #       geom_text(aes(x=lon, y=lat+0.01), data = places_loc, label=c("Your Address","Closest MVA office"), cex=1.8, colour="red")
+   # 
+   #      }
+   #    
+   #  })
+   #  
+   
+   
   }
 
 
