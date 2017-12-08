@@ -112,27 +112,7 @@ server <- function(input, output){
    closest_office = reactive({
      geo.office[which.min(gmapresult()$`Distance (miles)`),]
    })
-   
-   # closest_office = reactive({
-   #   
-   # # get longitude and latitude of user's location
-   # user.address = paste(paste(input$id.street ,input$id.city,"MD",sep=", "),input$id.zipcode)
-   # user.address.cord<-tryCatch({geocode(user.address, source = "google")},
-   #                   error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
-   # 
-   # # compute the distance from user's location to all the officee locations
-   # if(length(user.address.cord)>0){
-   #   ori = paste(user.address.cord$lat,user.address.cord$lon,sep="+")
-   #   mvadata = read.csv("./mvadata.csv") %>%
-   #     mutate(day = as.character(day),
-   #            service = as.character(service),
-   #            office = as.character(office))
-   #   disinfor<-gmapsdistance(origin = ori, destination = des %>% as.vector(),
-   #                           mode = input$id.travel.method, 
-   #                           shape = "long")#compute the distance from origin to all the office locations
-   #   geo.office[which.min(disinfor$Distance$Distance),]#find out the closest office
-   #   }
-   # })
+
    
    ########################
    ## Output results
