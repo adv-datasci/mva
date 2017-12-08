@@ -62,6 +62,7 @@ mvadata$index = ceiling((hms.to.seconds(mvadata$time)+1-hms.to.seconds("08:30:00
 ###########################
 
 library(dplyr)
+library(Hmisc)
 mvadata = mvadata %>%
   # delete holidays: Veteran's day and Thanksgiving Day
   filter(!date %in% c("2017-11-10", "2017-11-11", "2017-11-23"),
