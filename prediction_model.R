@@ -6,9 +6,8 @@ library(dplyr)
 library(ggplot2)
 load("mvadata.rda")
 
-predict_waittime <- function(office, service, day, time_index){
-  result <- list()
-  
+wait_time_trend <- function(office, service, day, time_index){
+
   subset_idx <- which(mvadata$office == office & mvadata$service == service & mvadata$day == day) 
   subset_data <- mvadata[subset_idx,]
   
@@ -36,12 +35,30 @@ predict_waittime <- function(office, service, day, time_index){
     annotate("text", x = 3, y = expect_wait + 0.8, label= paste0(round(expect_wait, digits = 1), " minutes")) + 
     annotate("text", x = time_index, y = -0.8, label= paste0(time_index))
     
+  return(p)
+}
 
+predict_waittime <- function(office, service, day, time_index){
+  wait_time_list <- c()
+  for (i in c(1:length(office))){
+    subset_idx <- which(mvadata$office == office[i] & mvadata$service == service & mvadata$day == day) 
+    subset_data <- mvadata[subset_idx,]
+    if (nrow(subset_data)==0){expect_wait <- NA
+    }else{
+      model.lo <- loess(wait_time ~ index, subset_data,span=0.2)
+      max_idx <- max(subset_data$index)
+      min_idx <- min(subset_data$index)
+      prediction_curve <- predict(model.lo, data.frame(index = seq(min_idx, max_idx, 0.05)), se = TRUE)
   
-  result[[1]] <- p
-  result[[2]] <- expect_wait
+      expect_wait <- predict(model.lo, data.frame(index = time_index[i]), se = TRUE)$fit
+      if (expect_wait < 0){expect_wait <- 0}
+    }
+    
+    
+    wait_time_list <- c(wait_time_list, expect_wait)
+  }
   
-  return(result)
+  return(wait_time_list)
 }
 
 # mvadata$office %>% unique()
@@ -50,9 +67,16 @@ predict_waittime <- function(office, service, day, time_index){
 office <- "Annapolis"
 service <- "LearnersPermit"
 day <- "Wednesday"
-time_index <- 35
+time_index <- 40
 
-result <- predict_waittime(office, service, day, time_index)
-print(result[[1]])
-print(result[[2]])
+graph <- wait_time_trend(office, service, day, time_index)
+print(graph)
+
+office <- mvadata$office %>% unique()
+service <- "LearnersPermit"
+day <- "Wednesday"
+time_index <- c(20:43)
+wait_time <- predict_waittime(office, service, day, time_index)
+print(wait_time)
+
 
