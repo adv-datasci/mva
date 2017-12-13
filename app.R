@@ -13,33 +13,25 @@ ui <- fluidPage(
   sidebarLayout(
     
     sidebarPanel(
-      
-      textInput(inputId="id.street", label="Street", value = ""),
-      
-      textInput(inputId="id.city", label="City", value = ""),
-      
-      textInput(inputId="id.zipcode", label="Zipcode", value = ""),
-      
+      textInput(inputId="id.street", label="Street", value = "1 W Pratt St"),
+      textInput(inputId="id.city", label="City", value = "Baltimore"),
+      textInput(inputId="id.zipcode", label="Zipcode", value = "21201"),
       selectInput(inputId = "id.travel.method",
                   label = "Select Mode of Travel",
-                  choices = c("driving","walking","bicycling","transit")),
-      
-      
+                  choices = c("Driving","Walking","Bicycling","Transit")),
       selectInput(inputId = "id.visit.reason",
                   label = "Select Service",
                   choices = c("Driver License Renewal", "Insurance Compliance Division", "Learners Permit",
                               "Other Drivers Services", "Other Vehicle Services", "Registration Renewal", 
                               "Tag Return","Title")),
-      
       selectInput(inputId = "id.day",
-                  label = "Select day",
+                  label = "Select Day of Week",
                   choices = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")),
-      
       sliderInput(inputId = "id.time",
                   label = "Select Time",
                   min = as.POSIXct("08:30:00", format = "%H:%M:%S"),
                   max = as.POSIXct("16:30:00", format = "%H:%M:%S"),
-                  value = c(as.POSIXct("10:00:00", format = "%H:%M:%S"), as.POSIXct("14:00:00", format = "%H:%M:%S")),
+                  value = as.POSIXct("09:00:00", format = "%H:%M:%S"),
                   step = 300,
                   timeFormat = "%H:%M:%S", ticks = F, animate = T),
 
@@ -52,13 +44,13 @@ ui <- fluidPage(
     mainPanel(
       
       tabsetPanel(type = "tab",
-                  tabPanel("plot1", 
-                           h3("The nearest office from your location is"), 
+                  tabPanel("Nearest Office", 
+                           h4("The nearest office from your location is"), 
                            textOutput("office"),
                            leafletOutput(outputId = "id.distPlot1"),
-                           h3("Estimated travel time and distance from your location to MVA offices"),
+                           h4("Estimated travel time and distance from your location to MVA offices"),
                            DT::dataTableOutput("gmapresultTable")),
-                  tabPanel("plot2",
+                  tabPanel("Expected Wait Time",
                            plotOutput(outputId = "id.distPlot2")))
       
     )
@@ -79,6 +71,7 @@ server <- function(input, output){
    library(gmapsdistance)
    library(ggmap)
    library(ggalt)
+   library(kimisc)
   
    geo.office = read.csv("./mva data.csv")
    des<-paste(geo.office$lat , geo.office$lon,sep = "+")
@@ -87,15 +80,18 @@ server <- function(input, output){
    ## Find the nearest office
    ########################
   
+   # obtain user's full address
    user.address = reactive({
      paste(paste(input$id.street ,input$id.city,"MD",sep=", "),input$id.zipcode)
    })
    
+   # obtain longitude and latitude of user's full address
    user.address.cord = reactive({
      tryCatch({geocode(user.address(), source = "google")},
               error=function(e){cat("The input address is not valid,try another one!\n")})#get the user's coordinates
    })
    
+   # calculate distance between user's address and MVA offices
    gmapresult = reactive({
      if(length(user.address.cord())>0){
        ori = paste(user.address.cord()$lat,user.address.cord()$lon,sep="+")
@@ -104,7 +100,7 @@ server <- function(input, output){
                 service = as.character(service),
                 office = as.character(office))
        disinfor<-gmapsdistance(origin = ori, destination = des %>% as.vector(),
-                               mode = input$id.travel.method, 
+                               mode = tolower(input$id.travel.method), 
                                shape = "long")#compute the distance from origin to all the office locations
        result = cbind(geo.office$Name, geo.office$Address,
                       disinfor$Status, disinfor$Time$Time, disinfor$Distance$Distance) %>% 
@@ -115,6 +111,7 @@ server <- function(input, output){
      }
    })
    
+   # find the closest office 
    closest_office = reactive({
      geo.office[which.min(gmapresult()$`Distance (miles)`),]
    })
@@ -128,7 +125,8 @@ server <- function(input, output){
    output$office <- renderText({
      
      a=closest_office()
-     paste(a$Name, a$Address)
+     paste(a$Name, a$Address, input$id.time)
+     
    
      })
    
@@ -161,22 +159,23 @@ server <- function(input, output){
      DT::datatable(a)
    })
    
-   output$id.distPlot2 <- renderPlot({
-
-     office_closest=closest_office()
-
-      sub.mvadata = mvadata %>%
-        filter(office == as.character(office_closest$Name) & service == gsub(pattern = " ", replacement =  "", x = input$id.visit.reason) & day == input$id.day) %>%
-        group_by(index) %>%
-        summarise(mean.wait.people = mean(num_people),
-                  mean.wait.time = mean(wait_time)) %>%
-        as.data.frame()
-
-      plot(sub.mvadata$index, sub.mvadata$mean.wait.time,
-           col = 'darkgray', pch = 16,
-           xlab = "Time Index (5 min)", ylab = "Mean Waiting Time (minutes)")
-
-  })
+  
+  #  output$id.distPlot2 <- renderPlot({
+  #    office_closest=closest_office()
+  #     sub.mvadata = mvadata %>%
+  #       filter(office == as.character(office_closest$Name) & 
+  #                service == gsub(pattern = " ", replacement =  "", x = input$id.visit.reason) & 
+  #                day == input$id.day) %>%
+  #       group_by(index) %>%
+  #       summarise(mean.wait.people = mean(num_people),
+  #                 mean.wait.time = mean(wait_time)) %>%
+  #       as.data.frame()
+  # 
+  #     plot(sub.mvadata$index, sub.mvadata$mean.wait.time,
+  #          col = 'darkgray', pch = 16,
+  #          xlab = "Time Index (5 min)", ylab = "Mean Waiting Time (minutes)")
+  # 
+  # })
    
    
    #  output$id.distPlot1 <- renderPlot({
@@ -199,8 +198,51 @@ server <- function(input, output){
    #    
    #  })
    #  
+  
    
+   output$id.distPlot2 <- renderPlot({
+     
+     a = closest_office()
+     
+     # convert time that user selected to time index 
+     time_index <- ceiling((hms.to.seconds(as.character(gsub("^.* ","",input$id.time)))+1-18000-hms.to.seconds("08:30:00"))/300)
+     #subset_idx <- which(mvadata$office == office & mvadata$service == service & mvadata$day == day) 
+     #subset_data <- mvadata[subset_idx,]
+     load("mvadata.rda")
+     subset_data <- mvadata %>% 
+       filter(office == as.character(a$Name) & 
+                service == gsub(pattern = " ", replacement = "", x = input$id.visit.reason) & 
+                day == input$id.day)
+     
+     model.lo <- loess(wait_time ~ index, subset_data,span=0.2)
+     max_idx <- max(subset_data$index)
+     min_idx <- min(subset_data$index)
+     prediction_curve <- predict(model.lo, data.frame(index = seq(min_idx, max_idx, 0.05)), se = TRUE)
+     # plot(seq(1,95,0.1),prediction$fit)
+     # points(subset_data$index,subset_data$wait_time,col="red")
+     
+     expect_wait <- predict(model.lo, data.frame(index = time_index), se = TRUE)$fit
+     if (expect_wait < 0){expect_wait <- 0}
+     
+     subset_dataframe <- data.frame(timepoints = seq(min_idx,max_idx,0.05), predict_wait = prediction_curve$fit)
+     
+     ggplot(data = subset_dataframe, aes(x=timepoints, y=predict_wait)) + 
+       geom_point(size = 0.2) + theme_bw() +
+       #labs(title = paste0("Wait time trend for service ", service," at ", office, " office")) +
+       labs(title = paste0("Wait time trend for service ", input$id.visit.reason, " at ", a$Name, " office")) +
+       scale_x_continuous(name = "Time Index") +
+       scale_y_continuous(name = "Expected Wait Time") + 
+       geom_segment(aes(x = time_index, y = 0, xend = time_index, yend = expect_wait), linetype="dotted", color = "blue", size=1) +
+       geom_segment(aes(x = 0, y = expect_wait, xend = time_index, yend = expect_wait), linetype="dotted", color = "blue", size=1) +
+       geom_segment(aes(x = time_index + 5, y = expect_wait + 2, xend = time_index - 0.3, yend = expect_wait + 0.2),
+                    arrow = arrow(length = unit(0.5, "cm")), color = "red") +
+       annotate("text", x = 3, y = expect_wait + 0.8, label= paste0(round(expect_wait, digits = 1), " minutes")) + 
+       annotate("text", x = time_index, y = -0.8, label= paste0(time_index))
+     
+     #return(p)
+   })
    
+
   }
 
 
