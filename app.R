@@ -41,7 +41,14 @@ ui <- fluidPage(
     mainPanel(
       tabsetPanel(type = "tab",
                   tabPanel("Instructions",
-                           h3("Description")),
+                           h3("Description"),
+                           "blah",
+                           h3("Methods"),
+                           "blah",
+                           h3("Instructions"),
+                           "blah",
+                           h3("Notes"),
+                           "blah"),
                   tabPanel("Recommended MVA Office", 
                            h3("Our Recommendation"), 
                            textOutput("office"),
@@ -50,7 +57,7 @@ ui <- fluidPage(
                            h3("Estimated Travel Time and Distance From Your Location to MVA Offices"),
                            DT::dataTableOutput("gmapresultTable")),
                   tabPanel("Wait Time Trend",
-                           h3("Wait Time Trend to the Recommended Office"),
+                           h3("Wait Time Trend at the Recommended Office"),
                            plotOutput(outputId = "id.distPlot2")))
     )
   )
@@ -151,7 +158,7 @@ server <- function(input, output){
     # we need to have office
     validate(
       need(try(sum(is.na(predict_result)) == 0), 
-           "You depart too late, so MVA will be closed by the time you the service. Or, the service is not available at any office by the time you arrive.")
+           "You depart too late, so MVA will be closed by the time you receive the service.Or, the service is not available at any office by the time you arrive.")
     )
     
     # the default time zone of shinyapps.io is UTC, which is 5 hours ahead of EST
