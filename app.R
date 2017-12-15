@@ -1,4 +1,3 @@
-#############################
 Sys.setenv(TZ = "EST")
 
 library(shiny)
@@ -27,28 +26,48 @@ ui <- fluidPage(
                               "Other Drivers Services", "Other Vehicle Services", "Registration Renewal", 
                               "Tag Return","Title")),
       textInput(inputId = "id.date", label="Date of Visit", value = "2018-01-01"),
-      sliderInput(inputId = "id.time",
-                  label = "Select Time",
-                  min = as.POSIXct("08:30:00", format = "%H:%M:%S"),
-                  max = as.POSIXct("16:30:00", format = "%H:%M:%S"),
-                  value = as.POSIXct("09:00:00", format = "%H:%M:%S"),
-                  step = 300,
-                  timeFormat = "%H:%M:%S", ticks = F, animate = T),
+      
+      
+      uiOutput('slider1'),
+      # sliderInput(inputId = "id.time",
+      #             label = "Select Time",
+      #             min = as.POSIXct("08:30:00", format = "%H:%M:%S"),
+      #             max = as.POSIXct("16:30:00", format = "%H:%M:%S"),
+      #             value = as.POSIXct("09:00:00", format = "%H:%M:%S"),
+      #             step = 300,
+      #             timeFormat = "%H:%M:%S", ticks = F, animate = T),
       submitButton("Update")
+      
     ),
-    
     # Show a plot of the generated distribution
     mainPanel(
       tabsetPanel(type = "tab",
                   tabPanel("Instructions",
                            h3("Description"),
-                           "blah",
+                           "This Shiny app takes a users location and a specific time and date and lists which MVA office is best for them to visit to take care of their business as early as possible. This app incorporates travel distance and time between the users location and MVA offices and wait times for services offered at each of the MVA offices.",
                            h3("Methods"),
-                           "blah",
+                           em("Data"),
+                           br(),
+                           br(),
+                           "The MVA of Maryland posts wait times every 5 minutes while the locations are open. Using R, we scraped wait times for each service at each MVA office for 4 weeks from November 9, 2017 to December 6, 2017. Data scraped on holidays (Veteran’s Day: November 10-11, 2017 and Thanksgiving day: November 23, were excluded from prediction modeling.",
+                           br(),
+                           br(),
+                           em("Prediction Model"),
+                           br(),
+                           br(),
+                           "The prediction Model takes in user’s address, expected leaving date and time, and gives user the suggested MVA office to go where user can start his/her service first compared to other MVA offices. We use the wait times at every MVA offices from November 9, 2017 to December 6, 2017 as our training data to make predictions on expected wait time for future dates at different time slots. Our App takes account of actual travel time from user's location to MVA offices using Google Map API, predicts wait time at difference MVA offices for the planned service based on user's expected arrival time, and then reports the expected service start time at the suggested MVA office where minimizes both travel and wait time. Note that our App only reports the suggested MVA office to user when the user’s expected service start time is before the office closes.",
                            h3("Instructions"),
-                           "blah",
+                           "1. Please type in your street address, city, and zip code (user location/departure address)",
+                           br(),
+                           "2. Please select your mode of transportation and service you would like to get at an MVA office.",
+                           br(),
+                           "3. Please type in the date of visit in the format of yyyy-mm-dd.",
+                           br(),
+                           "4. Please select the time of departure.",
+                           br(),
+                           "5. Click “Update” and wait for a few seconds to process your request.",
                            h3("Notes"),
-                           "blah"),
+                           "According to the Maryland MVA website (http://www.mva.maryland.gov/sebin/customerwaittimes/), the MVA's busiest days are at the end of each month and the first days of the next month, and MVA strongly recommends that you plan your visit during the middle of the month. In addition, MVA expect high volume days on Mondays, Fridays, and Saturdays overall, so plan your visit on a Tuesday, Wednesday, or Thursday to minimize your time at MVA."),
                   tabPanel("Recommended MVA Office", 
                            h3("Our Recommendation"), 
                            textOutput("office"),
@@ -90,6 +109,29 @@ server <- function(input, output){
   source("Distance.Time.R")
   source("prediction_model.R")
   
+  output$slider1 <- renderUI({
+    slider2.value <- format(as.Date(input$id.date),"%A")
+    if (slider2.value=="Sunday"){
+      sliderInput("id.time","MVA is close on Sunday", 
+                  min = as.POSIXct("08:30:00", format = "%H:%M:%S"), 
+                  max = as.POSIXct("08:30:00", format = "%H:%M:%S"),
+                  value=as.POSIXct("08:30:00", format = "%H:%M:%S"),
+                  step=300,timeFormat = "%H:%M:%S", ticks = F, animate = T)
+    } else if(slider2.value=="Saturday"){
+      sliderInput("id.time","Select Time",
+                  min = as.POSIXct("08:30:00", format = "%H:%M:%S"),
+                  max=as.POSIXct("12:00:00", format = "%H:%M:%S"),
+                  value=as.POSIXct("09:00:00", format = "%H:%M:%S"),
+                  step=300,timeFormat = "%H:%M:%S", ticks = F, animate = T)
+    } else{sliderInput("id.time","Select Time", 
+                       min = as.POSIXct("08:30:00", format = "%H:%M:%S"), 
+                       max = as.POSIXct("16:30:00", format = "%H:%M:%S"),
+                       value=as.POSIXct("09:00:00", format = "%H:%M:%S"),
+                       step=300,timeFormat = "%H:%M:%S", ticks = F, animate = T)
+    }
+    
+  })
+  
   ## 1. obtain user's location in plain english
   user.address = reactive({
     paste(paste(input$id.street ,input$id.city,"MD",sep=", "),input$id.zipcode)
@@ -121,17 +163,28 @@ server <- function(input, output){
     validate(
       need(try(sum(is.na(user.address.cord())) == 0), "Retry in 5 seconds - Coordinates not found!")
     )
+    validate(
+      need(try(format(as.Date(input$id.date),"%A")!="Sunday"), "MVA office is closed on Sunday!")
+    )
     # we need to have future departure date, otherwise we output the following error message
     validate(
       need(try(as.Date(input$id.date) > Sys.Date()), "The departure date has to be some time in the future!")
     )
     
     ori <- gsub(" ", "+", user.address())
-    disinfor <- gmapsdistance(origin = ori, destination = des %>% as.vector(),
-                              mode = tolower(input$id.travel.method), 
-                              dep_date = as.character((as.Date(input$id.date)+7)), 
-                              dep_time = as.character(gsub("^.* ","", input$id.time)), 
-                              shape = "long")
+    disinfor <- try({gmapsdistance(origin = ori, destination = des %>% as.vector(),
+                                   mode = tolower(input$id.travel.method), 
+                                   dep_date = as.character((as.Date(input$id.date)+7)), 
+                                   dep_time = as.character(gsub("^.* ","", input$id.time)), 
+                                   shape = "long")}, silent = TRUE)
+    if(inherits(disinfor, "try-error")){
+      cat("fail to use the Google Maps Distance Matrix API to compute the distances and times between your location and MVA offices.")
+      disinfor = NULL 
+    } 
+    # we need to have valid travel distance and times, otherwise we output the following error message
+    validate(
+      need(try(is.null(disinfor) == FALSE), "Retry in 15 seconds - Travel distances and times are not computed!")
+    )
     
     output.data <- geo.office$Name %>% as.data.frame()
     colnames(output.data)[1] <- "office"
@@ -184,7 +237,7 @@ server <- function(input, output){
           "service. You are expected to arrive at the office at", predict_result$V3,
           ", wait approximately", predict_result$V4, "minutes, and get the service at", predict_result$V5)
   })
- 
+  
   ## 6. output map
   output$id.distPlot1 <- renderLeaflet({
     
