@@ -88,7 +88,7 @@ shinyServer(function(input, output){
     )
     # we need to have future departure date, otherwise we output the following error message
     validate(
-      need(try(as.Date(input$id.date) > Sys.Date()), "The departure date has to be some time in the future!")
+      need(try(as.POSIXct(paste(as.Date(input$id.date), input$id.time), tz = "EST")-hours(5) >= Sys.time()), "The departure time has to be some time in the future!")
     )
     
     ori <- gsub(" ", "+", user.address())
