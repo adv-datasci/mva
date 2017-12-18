@@ -1,3 +1,4 @@
+Sys.setenv(TZ = "EST")
 library(shinydashboard)
 library(leaflet)
 

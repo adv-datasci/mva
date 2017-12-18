@@ -288,6 +288,7 @@ server <- function(input, output){
     office <- a$V1 %>% as.character()
     time_index <- a$V2 %>% as.character() %>% as.numeric()
     arrival_time <- a$V3
+    service <- gsub(pattern = " ", replacement = "", x = input$id.visit.reason)
     
     # subset data based on office, service and day
     load("mvadata.rda")
