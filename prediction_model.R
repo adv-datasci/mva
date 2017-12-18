@@ -7,6 +7,7 @@ library(ggplot2)
 library(kimisc)
 library(lubridate)
 load("mvadata.rda")
+tz(mvadata$date)
 
 wait_time_trend <- function(office, service, day, time_index, arrival_time){
 
@@ -86,21 +87,24 @@ choose_office <- function(office, service, day, arrival_time){
 ## function outputs testing
 
 #output.data <- feiyang()
-load("sample_output.RData")
-office <- levels(droplevels(output.data$office))
-service <- "LearnersPermit"
-day <- output.data$day[1] 
-arrival_time <- output.data$arr.time
-
-predict_result <- choose_office(office, service, day, arrival_time)
-print(predict_result)
-
-shiny_output <- output.data[output.data$office == predict_result[[1]],]
-shiny_output
-shiny_output$est.time %>% seconds_to_period()
-  
-office <- predict_result[[1]]
-time_index <- predict_result[[2]]
-arrival_time <- predict_result[[3]]
-graph <- wait_time_trend(office, service, day, time_index, arrival_time)
-print(graph)
+# load("sample output.RData")
+# output.data2 = est.time.distance(address="929 North Wolfe Street, MD 21209",commute="driving",dep.date="2017-12-31",dep.time="12:40:00")
+# office <- levels(droplevels(output.data2$office))
+# office <- as.character(output.data2$office)
+# service <- "Title"
+# day <- output.data2$day[1] 
+# arrival_time <- output.data2$arr.time
+# 
+# predict_result <- choose_office(office, service, day, arrival_time)
+# print(predict_result)
+# 
+# shiny_output <- output.data[output.data$office == predict_result[[1]],]
+# shiny_output
+# shiny_output$est.time %>% seconds_to_period()
+#   
+# office <- predict_result[[1]]
+# time_index <- predict_result[[2]]
+# arrival_time <- predict_result[[3]]
+# graph <- wait_time_trend(office, service, day, time_index, arrival_time)
+# print(graph)
+ 

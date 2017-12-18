@@ -37,7 +37,7 @@ est.time.distance <-function(address,commute,dep.date,dep.time){
   
   output.data <- geo.office$Name %>% as.data.frame()
   colnames(output.data)[1]<-"office"
-  output.data$est.time<-disinfor$Time[[3]]/60
+  output.data$est.time<-disinfor$Time[[3]]/60 
   output.data$dis <- udunits2::ud.convert(disinfor$Distance[[3]], "m", "km")
   arr.time<-seconds_to_period(disinfor$Time[[3]]+period_to_seconds(hms(dep.time)))
   output.data$arr.time<-sprintf("%02i:%02i:%02i", hour(arr.time), minute(arr.time),second(arr.time))
@@ -50,6 +50,6 @@ est.time.distance <-function(address,commute,dep.date,dep.time){
 #dep.date = "2017-12-13"
 #dep.time = "15:40:00"
 
-#output.data<-est.time.distance(address="929 North Wolfe Street, MD 21209",commute="driving",dep.date="2017-12-12",dep.time="23:40:00")
+#output.data<-est.time.distance(address="929 North Wolfe Street, MD 21209",commute="driving",dep.date="2017-12-12",dep.time="08:40:00")
 #coordinate of the address :Latitude(39.301224),Longitude(-76.590923)
 
