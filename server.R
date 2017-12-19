@@ -109,7 +109,7 @@ shinyServer(function(input, output){
     output.data <- geo.office$Name %>% as.data.frame()
     colnames(output.data)[1] <- "office"
     output.data$est.time <- disinfor$Time[[3]]/60 %>% round(.,0)
-    output.data$dis <- udunits2::ud.convert(disinfor$Distance[[3]], "m", "km") %>% round(.,1)
+    output.data$dis <- udunits2::ud.convert(disinfor$Distance[[3]], "m", "km") %>% round(.,2)
     arr.time <- seconds_to_period(disinfor$Time[[3]]+period_to_seconds(hms(as.character(gsub("^.* ","", input$id.time)))))
     output.data$arr.time <- sprintf("%02i:%02i:%02i", hour(arr.time), minute(arr.time),second(arr.time))
     output.data$day <- format(as.Date(input$id.date), "%A")
@@ -118,7 +118,7 @@ shinyServer(function(input, output){
   
   
   ## 4. incorporate travel time, wait time and choose the office that gives the earliest service start time
-  predict_result = reactive({
+  predict_result0 = reactive({
     output.data = output.data()
     #office <- levels(droplevels(output.data$office)) <- The order of office is different from output.data$office
     office <- output.data$office %>% as.character()
@@ -133,12 +133,18 @@ shinyServer(function(input, output){
       need(try(sum(is.na(predict_result)) == 0), 
            "You depart too late, so MVA will be closed by the time you receive the service.Or, the service is not available at any office by the time you arrive.")
     )
+    predict_result
+  })
     
+  predict_result = reactive({
+    predict_result = predict_result0()
+    predict_result = predict_result[c(1:5)]
+      
     # the default time zone of shinyapps.io is UTC, which is 5 hours ahead of EST
     predict_result <- as.data.frame(t(ldply(predict_result))) %>% 
       mutate(V2 = as.numeric(as.character(V2)),
              V3 = gsub("^.* ","", as.POSIXct(V3, format = "%H:%M:%S")),
-             V4 = round(as.numeric(as.character(V4)),1),
+             V4 = round(as.numeric(as.character(V4)),2),
              V5 = gsub("^.* ","", as.POSIXct(V5, format = "%H:%M:%S")))
     #colnames(predict_result)=c("Office","Arrival Time","Waiting Time","Service Time")
     rownames(predict_result) = NULL
@@ -171,7 +177,7 @@ shinyServer(function(input, output){
     maryland = map("county","maryland",fill=TRUE, plot=FALSE)
     leaflet(data = maryland) %>%
       #addTiles() %>%
-      addProviderTiles(providers$Esri.NatGeoWorldMap) %>%
+      addTiles() %>%
       addPolygons(fillColor = topo.colors(10, alpha = 0.2), stroke = TRUE, color = "blue", weight = 2) %>%
       # set default view to Baltimore area
       # setView(lng = -77.03687 , lat = 38.90719, zoom = 8) %>%
@@ -195,7 +201,15 @@ shinyServer(function(input, output){
              dis = round(dis, 2),
              arr.time = gsub("^.* ","", as.POSIXct(arr.time, format = "%H:%M:%S") - hours(5))) %>%arrange(arr.time)%>%
       setNames(c("Office","Address","Travel Time (min)","Distance (km)","Arrival Time"))
-    DT::datatable(a)
+    b = predict_result0()
+    b = b[c(6:9)] %>%
+      ldply() %>% t() %>% as.data.frame() %>% 
+      mutate(V3 = round(as.numeric(as.character(V3)),2)) %>% 
+      select(V1, V3, V4) %>%
+      setNames(c("Office","Wait Time (min)","Service Start Time"))
+    c = merge(a, b, by="Office")
+    c = c[order(c$`Service Start Time`),]
+    DT::datatable(c)
   })
   
   output$approvalBox <- renderValueBox({
@@ -206,7 +220,9 @@ shinyServer(function(input, output){
   })
   
   
+  
   ## 8. output wait time trend
+  timelabel <- create_time_index()
   output$id.distPlot2 <- renderPlot({
     
     # define variables
@@ -237,14 +253,16 @@ shinyServer(function(input, output){
     
     ggplot(data = subset_dataframe, aes(x=timepoints, y=predict_wait)) + 
       geom_line(size = 1) + theme_bw() +
+      scale_x_continuous(breaks = seq(1,length(timelabel),5), labels = timelabel[seq(1,length(timelabel),5)]) +
       labs(title = paste0("Waiting Time Trend for Service ", service," at ", office, " office")) +
-      scale_x_continuous(name = "Arrival Time") +
-      scale_y_continuous(name = "Expected waiting time (minutes)") + 
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(x = "Arrival Time") + 
+      labs(y = "Expected Wait Time (minutes)") +
       geom_segment(aes(x = time_index, y = 0, xend = time_index, yend = expect_wait), linetype="dotted", color = "blue", size=1) +
       geom_segment(aes(x = 0, y = expect_wait, xend = time_index, yend = expect_wait), linetype="dotted", color = "blue", size=1) +
       geom_segment(aes(x = time_index + 5, y = expect_wait + 2, xend = time_index - 0.3, yend = expect_wait + 0.2),
                    arrow = arrow(length = unit(0.5, "cm")), color = "red") +
-      annotate("text", x = 3, y = expect_wait + 0.8, label= paste0(round(expect_wait, digits = 1), " minutes")) + 
+      annotate("text", x = 3, y = expect_wait + 0.8, label= paste0(round(expect_wait, digits = 2), " minutes")) + 
       annotate("text", x = time_index, y = -0.8, label= paste0(arrival_time))
   })
   
