@@ -1,3 +1,4 @@
+Sys.setenv(TZ = "EST")
 library(shiny)
 library(shinydashboard)
 
@@ -81,14 +82,14 @@ shinyServer(function(input, output){
   output.data = reactive({
     # we need to have valid longitde and latitude to proceed, otherwise we output the following error message
     validate(
-      need(try(sum(is.na(user.address.cord())) == 0), "Retry in 5 seconds - Coordinates not found!")
+      need(try(sum(is.na(user.address.cord())) == 0), "Retry in 15 seconds - Coordinates not found!")
     )
     validate(
       need(try(format(as.Date(input$id.date),"%A")!="Sunday"), "MVA office is closed on Sunday!")
     )
     # we need to have future departure date, otherwise we output the following error message
     validate(
-      need(try(as.POSIXct(paste(as.Date(input$id.date), input$id.time), tz = "EST")-hours(5) >= Sys.time()), "The departure time has to be some time in the future!")
+      need(try(as.POSIXct(paste(as.Date(input$id.date), as.character(gsub("^.* ","", input$id.time))), tz = "EST") - hours(5) >= Sys.time()), "The departure time has to be some time in the future!")
     )
     
     ori <- gsub(" ", "+", user.address())
